@@ -1,0 +1,27 @@
+{
+  "name": "Bolivia Tax Monitor",
+  "short_name": "BO Tax",
+  "description": "Surveillance fiscale bolivienne — Résident étranger ETF",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080d1a",
+  "theme_color": "#080d1a",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "screenshots": []
+}

@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<!-- build:302434 -->
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080d1a" />
+  <meta name="description" content="Surveillance fiscale bolivienne — Résident étranger ETF" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="BO Tax" />
+
+  <!-- Security headers via meta (renforcés côté Cloudflare) -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta http-equiv="Referrer-Policy" content="no-referrer" />
+  <!-- CSP : autorise uniquement votre worker Cloudflare pour les appels API -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             script-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+             style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;
+             font-src https://fonts.gstatic.com;
+             connect-src 'self' https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev;
+             img-src 'self' data:;
+             frame-ancestors 'none';" />
+
+  <title>Bolivia Tax Monitor</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:        #080d1a;
+      --surface:   #0f1629;
+      --surface2:  #161f35;
+      --border:    #1e2d4a;
+      --accent:    #00d4ff;
+      --accent2:   #0ea5e9;
+      --gold:      #f59e0b;
+      --red:       #ef4444;
+      --green:     #10b981;
+      --text:      #e2eaf8;
+      --muted:     #4a6080;
+      --font:      'Syne', sans-serif;
+      --mono:      'DM Mono', monospace;
+      --radius:    14px;
+      --safe-top:  env(safe-area-inset-top, 0px);
+      --safe-bot:  env(safe-area-inset-bottom, 0px);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+
+    /* ── PIN SCREEN ── */
+    #pin-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 32px;
+      padding: calc(var(--safe-top) + 24px) 24px calc(var(--safe-bot) + 24px);
+    }
+    #pin-screen.hidden { display: none; }
+
+    .pin-logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #0ea5e9, #00d4ff);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      box-shadow: 0 0 40px rgba(0,212,255,0.25);
+    }
+    .pin-title { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; text-align: center; }
+    .pin-sub { font-size: 13px; color: var(--muted); text-align: center; }
+
+    .pin-dots {
+      display: flex; gap: 14px;
+    }
+    .pin-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--border);
+      background: transparent;
+      transition: all 0.15s;
+    }
+    .pin-dot.filled {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(0,212,255,0.5);
+    }
+    .pin-dot.error {
+      background: var(--red);
+      border-color: var(--red);
+      animation: shake 0.3s ease;
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+
+    .pin-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 72px);
+      gap: 14px;
+    }
+    .pin-key {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 22px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .pin-key:active { transform: scale(0.92); background: var(--surface2); border-color: var(--accent); }
+    .pin-key.del { font-size: 18px; color: var(--muted); }
+    .pin-key.empty { visibility: hidden; }
+    .pin-error-msg {
+      font-size: 13px; color: var(--red);
+      height: 18px; text-align: center;
+    }
+    .pin-hint {
+      font-size: 11px; color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* ── APP ── */
+    #app {
+      display: flex; flex-direction: column;
+      height: 100vh;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bot);
+    }
+    #app.locked { display: none; }
+
+    /* Header */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #0ea5e9, #00d4ff);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 16px rgba(0,212,255,0.2);
+    }
+    .header-title { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; }
+    .header-sub { font-size: 10px; color: var(--muted); margin-top: 1px; font-family: var(--mono); }
+    .scan-btn {
+      background: linear-gradient(135deg, #0ea5e9, #00d4ff);
+      border: none; border-radius: 20px;
+      padding: 7px 14px;
+      color: #080d1a; font-family: var(--font);
+      font-size: 12px; font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(0,212,255,0.25);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .scan-btn:active { transform: scale(0.96); }
+    .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Scan progress */
+    .scan-bar {
+      height: 3px;
+      background: var(--border);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .scan-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0ea5e9, #00d4ff);
+      width: 0%;
+      transition: width 0.2s;
+    }
+
+    /* Scroll content */
+    .scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 20px 16px;
+    }
+
+    /* Bottom nav */
+    .bottom-nav {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-shrink: 0;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 10px 4px;
+      border: none; background: transparent;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 0.15s;
+      gap: 4px;
+    }
+    .nav-icon { font-size: 20px; }
+    .nav-label {
+      font-size: 10px; font-family: var(--mono);
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+    .nav-item.active .nav-label { color: var(--accent); }
+    .nav-item.active .nav-icon { filter: drop-shadow(0 0 6px rgba(0,212,255,0.6)); }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-accent-red  { border-color: rgba(239,68,68,0.3); }
+    .card-accent-gold { border-color: rgba(245,158,11,0.3); }
+    .card-accent-cyan { border-color: rgba(0,212,255,0.3); }
+    .card-accent-green{ border-color: rgba(16,185,129,0.3); }
+
+    /* Metrics grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .metric-label {
+      font-size: 10px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px;
+      font-family: var(--mono);
+      margin-bottom: 6px;
+    }
+    .metric-value {
+      font-size: 36px; font-weight: 800;
+      line-height: 1;
+    }
+    .metric-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+    /* Risk bar */
+    .risk-bar {
+      background: var(--border);
+      border-radius: 4px; height: 5px;
+      margin-top: 10px; overflow: hidden;
+    }
+    .risk-fill {
+      height: 100%; border-radius: 4px;
+      transition: width 1s ease;
+    }
+
+    /* Section title */
+    .section-title {
+      font-size: 13px; font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--mono);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* Alert items */
+    .alert-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      display: flex; gap: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .alert-item.crit  { border-color: rgba(239,68,68,0.35); }
+    .alert-item.warn  { border-color: rgba(245,158,11,0.35); }
+    .alert-item.selected { border-color: var(--accent) !important; background: rgba(0,212,255,0.04); }
+
+    .alert-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      margin-top: 5px; flex-shrink: 0;
+    }
+    .dot-crit  { background: var(--red);   box-shadow: 0 0 8px rgba(239,68,68,0.7); }
+    .dot-warn  { background: var(--gold);  box-shadow: 0 0 6px rgba(245,158,11,0.5); }
+    .dot-info  { background: var(--accent2); }
+    .dot-ok    { background: var(--green); }
+
+    .alert-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; line-height: 1.4; }
+    .alert-meta  {
+      font-size: 10px; color: var(--muted);
+      font-family: var(--mono);
+      margin-bottom: 6px;
+      display: flex; gap: 10px; flex-wrap: wrap;
+    }
+    .alert-summary { font-size: 12px; color: #8aa0c0; line-height: 1.55; }
+    .alert-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag {
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.18);
+      border-radius: 4px; padding: 2px 6px;
+      font-size: 10px; color: #00d4ff; font-family: var(--mono);
+    }
+    .alert-link {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin-top: 10px;
+      font-size: 11px; color: var(--accent);
+      text-decoration: none;
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.2);
+      padding: 4px 10px; border-radius: 6px;
+      font-family: var(--mono);
+    }
+
+    /* Filter chips */
+    .filter-row { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
+    .chip {
+      padding: 5px 12px; border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 11px; font-family: var(--mono);
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chip.active {
+      border-color: var(--accent);
+      background: rgba(0,212,255,0.1);
+      color: var(--accent);
+    }
+
+    /* AI box */
+    .ai-box {
+      background: linear-gradient(135deg, var(--surface) 0%, #0d1628 100%);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+    .ai-placeholder {
+      text-align: center; padding: 40px 20px; color: var(--muted);
+    }
+    .ai-emoji { font-size: 40px; margin-bottom: 12px; }
+    .ai-content {
+      font-size: 13px; line-height: 1.75;
+      color: #a0b8d8; white-space: pre-wrap;
+      font-family: var(--mono);
+    }
+    .ai-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #0ea5e9, #00d4ff);
+      border: none; border-radius: 10px;
+      padding: 14px;
+      color: #080d1a; font-family: var(--font);
+      font-size: 14px; font-weight: 800;
+      cursor: pointer;
+      margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 20px rgba(0,212,255,0.25);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ai-btn:active { transform: scale(0.98); }
+
+    /* Source cards */
+    .source-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .source-icon { font-size: 26px; flex-shrink: 0; }
+    .source-name { font-size: 13px; font-weight: 700; }
+    .source-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .source-url  { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+    .source-badge {
+      display: inline-block; margin-top: 6px;
+      font-size: 10px; font-family: var(--mono);
+      padding: 2px 8px; border-radius: 10px;
+    }
+
+    /* Keyword items */
+    .kw-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .kw-name { font-size: 13px; font-family: var(--mono); color: var(--accent); }
+    .kw-count {
+      font-size: 11px; color: var(--muted);
+      background: var(--surface2);
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .kw-bar-wrap { flex: 1; margin: 0 14px; background: var(--border); border-radius: 4px; height: 4px; }
+    .kw-bar-fill { height: 100%; background: linear-gradient(90deg, #0ea5e9, #00d4ff); border-radius: 4px; }
+
+    /* Two-col layout */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+
+    /* Status list */
+    .status-list { list-style: none; }
+    .status-list li {
+      font-size: 12px; color: #8aa0c0;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 8px; line-height: 1.4;
+    }
+    .status-list li:last-child { border-bottom: none; }
+
+    /* Lock button */
+    .lock-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); border-radius: 8px;
+      padding: 6px 12px; font-size: 11px;
+      font-family: var(--mono);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; animation: spin 1s linear infinite; }
+
+    /* Page transitions */
+    .page { display: none; }
+    .page.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ PIN SCREEN ═══════════════════════════════ -->
+<div id="pin-screen">
+  <div class="pin-logo">🇧🇴</div>
+  <div>
+    <div class="pin-title">Bolivia Tax Monitor</div>
+    <div class="pin-sub" style="margin-top:6px">Entrez votre PIN pour accéder</div>
+  </div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-error-msg" id="pin-error"></div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pinPress('1')">1</button>
+    <button class="pin-key" onclick="pinPress('2')">2</button>
+    <button class="pin-key" onclick="pinPress('3')">3</button>
+    <button class="pin-key" onclick="pinPress('4')">4</button>
+    <button class="pin-key" onclick="pinPress('5')">5</button>
+    <button class="pin-key" onclick="pinPress('6')">6</button>
+    <button class="pin-key" onclick="pinPress('7')">7</button>
+    <button class="pin-key" onclick="pinPress('8')">8</button>
+    <button class="pin-key" onclick="pinPress('9')">9</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="pinPress('0')">0</button>
+    <button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <div class="pin-hint">PIN par défaut : 1234 — modifiable dans le code</div>
+</div>
+
+<!-- ═══════════════════════════════ APP ═══════════════════════════════ -->
+<div id="app" class="locked">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-icon">🇧🇴</div>
+      <div>
+        <div class="header-title">BO Tax Monitor</div>
+        <div class="header-sub" id="last-scan-label">Chargement...</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="lock-btn" onclick="lockApp()">🔒</button>
+      <button class="scan-btn" id="scan-btn" onclick="runScan()">
+        <span>🔍</span> Scanner
+      </button>
+    </div>
+  </div>
+
+  <!-- Scan bar -->
+  <div class="scan-bar"><div class="scan-fill" id="scan-fill"></div></div>
+
+  <!-- Scroll area -->
+  <div class="scroll-area">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="metrics-grid">
+        <div class="card card-accent-cyan" style="grid-column:1/-1">
+          <div class="metric-label">Score de risque fiscal</div>
+          <div style="display:flex;align-items:flex-end;gap:8px">
+            <div class="metric-value" id="risk-value" style="color:#f59e0b">45</div>
+            <div style="font-size:14px;color:var(--muted);margin-bottom:6px">/100</div>
+          </div>
+          <div class="risk-bar"><div class="risk-fill" id="risk-fill" style="width:45%;background:linear-gradient(90deg,#10b981,#f59e0b)"></div></div>
+          <div class="metric-sub" id="risk-label">⚡ Surveillance active — PL N°256-21 en cours</div>
+        </div>
+        <div class="card">
+          <div class="metric-label">Critiques</div>
+          <div class="metric-value" id="cnt-crit" style="color:var(--red)">1</div>
+          <div class="metric-sub">IGF abrogation</div>
+        </div>
+        <div class="card">
+          <div class="metric-label">Attention</div>
+          <div class="metric-value" id="cnt-warn" style="color:var(--gold)">2</div>
+          <div class="metric-sub">RC-IVA élargi</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card card-accent-green">
+          <div class="section-title" style="color:var(--green)">✅ Favorable</div>
+          <ul class="status-list">
+            <li><span style="color:var(--green)">→</span> Source territoriale confirmée PwC</li>
+            <li><span style="color:var(--green)">→</span> IGF seuil 4,3M CHF — hors portée</li>
+            <li><span style="color:var(--green)">→</span> Projet abrogation IGF en cours</li>
+            <li><span style="color:var(--green)">→</span> UCITS irlandais : 0% retenue BO</li>
+          </ul>
+        </div>
+        <div class="card card-accent-gold">
+          <div class="section-title" style="color:var(--gold)">⚠️ Vigilance</div>
+          <ul class="status-list">
+            <li><span style="color:var(--gold)">→</span> PL N°256-21 RC-IVA élargi</li>
+            <li><span style="color:var(--gold)">→</span> Réforme fiscale 2026</li>
+            <li><span style="color:var(--gold)">→</span> Domicile fiscal zone grise</li>
+            <li><span style="color:var(--gold)">→</span> Consulter fiscaliste local</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section-title">🔔 Dernières alertes</div>
+      <div id="dashboard-alerts"></div>
+    </div>
+
+    <!-- ── ALERTES ── -->
+    <div class="page" id="page-alerts">
+      <div class="filter-row" id="filter-row">
+        <button class="chip active" data-filter="all" onclick="setFilter('all',this)">Tout</button>
+        <button class="chip" data-filter="critical" onclick="setFilter('critical',this)">Critique</button>
+        <button class="chip" data-filter="warning" onclick="setFilter('warning',this)">Attention</button>
+        <button class="chip" data-filter="info" onclick="setFilter('info',this)">Info</button>
+      </div>
+      <div id="alerts-list"></div>
+    </div>
+
+    <!-- ── ANALYSE IA ── -->
+    <div class="page" id="page-ai">
+      <button class="ai-btn" id="ai-btn" onclick="runAI()">
+        <span id="ai-btn-icon">▶</span>
+        <span id="ai-btn-text">Lancer l'analyse IA</span>
+      </button>
+      <div class="ai-box" id="ai-box">
+        <div class="ai-placeholder">
+          <div class="ai-emoji">🤖</div>
+          <div style="font-size:13px;margin-bottom:6px">Analyse IA prête</div>
+          <div style="font-size:11px;font-family:var(--mono)">Synthèse des risques fiscaux pour votre profil — cédula de extranjero, 170k CHF ETF UCITS</div>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(0,212,255,0.15)">
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;font-family:var(--mono)">
+          🔒 <strong style="color:var(--accent)">Proxy sécurisé :</strong> Les appels IA transitent par votre Cloudflare Worker. La clé API n'est jamais exposée côté client. Configurez l'URL du worker dans <code>config.js</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SOURCES ── -->
+    <div class="page" id="page-sources">
+      <div id="sources-list"></div>
+    </div>
+
+    <!-- ── MOTS-CLÉS ── -->
+    <div class="page" id="page-keywords">
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;font-family:var(--mono)">
+          Ces termes déclenchent une alerte dès leur apparition dans une source surveillée.
+        </div>
+      </div>
+      <div id="kw-list"></div>
+    </div>
+
+  </div><!-- end scroll-area -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="showPage('alerts',this)">
+      <span class="nav-icon">🔔</span>
+      <span class="nav-label">Alertes</span>
+    </button>
+    <button class="nav-item" onclick="showPage('ai',this)">
+      <span class="nav-icon">🤖</span>
+      <span class="nav-label">Analyse</span>
+    </button>
+    <button class="nav-item" onclick="showPage('sources',this)">
+      <span class="nav-icon">🔗</span>
+      <span class="nav-label">Sources</span>
+    </button>
+    <button class="nav-item" onclick="showPage('keywords',this)">
+      <span class="nav-icon">🏷️</span>
+      <span class="nav-label">Termes</span>
+    </button>
+  </nav>
+
+</div><!-- end app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Bolivia Tax Monitor — Configuration
+//  Modifiez ce fichier selon vos besoins
+// ═══════════════════════════════════════════════════════════════
+
+const CONFIG = {
+
+  // ── PIN ────────────────────────────────────────────────────────
+  // Hash SHA-256 du PIN à 4 chiffres.
+  // PIN par défaut : 1234
+  // Pour changer : https://emn178.github.io/online-tools/sha256.html
+  // Entrez votre PIN → copiez le hash → remplacez la valeur ci-dessous
+  PIN_HASH: "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+
+  // ── CLOUDFLARE WORKER ──────────────────────────────────────────
+  // URL de votre Cloudflare Worker (proxy sécurisé pour l'IA)
+  // Laissez null pour désactiver l'IA et utiliser l'outil en mode statique
+  // Exemple : "https://bolivia-tax-ai.votrecompte.workers.dev"
+  WORKER_URL: null,
+
+  // ── SESSION ───────────────────────────────────────────────────
+  // Durée de session en minutes avant re-demande du PIN (0 = jamais)
+  SESSION_MINUTES: 30,
+
+  // ── VOTRE PROFIL ──────────────────────────────────────────────
+  // Utilisé dans le prompt IA pour personnaliser l'analyse
+  PROFILE: {
+    residence: "Bolivie — cédula de extranjero",
+    portfolio: "170 000 CHF en ETF UCITS irlandais (domiciliés Irlande)",
+    strategy: "ETF capitalisants (Acc) + dividendes (Dist) via UCITS",
+    concern: "IGF, RC-IVA, fiscalité revenus étrangers, PL N°256-21",
+  },
+};
+
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Bolivia Tax Monitor — App Logic
+//  Sécurité : aucune clé API côté client, PIN hashé SHA-256
+// ═══════════════════════════════════════════════════════════════
+
+'use strict';
+
+// ── DATA ────────────────────────────────────────────────────────
+
+const SOURCES = [
+  { id:"asamblea", name:"Asamblea Legislativa", url:"https://www.asamblea.gob.bo", icon:"🏛️", cat:"official",       desc:"Proyectos de ley, sesiones plenarias" },
+  { id:"sin",      name:"SIN Bolivia",          url:"https://www.impuestos.gob.bo", icon:"📋", cat:"official",       desc:"Resoluciones, circulares, normativa" },
+  { id:"eldeber",  name:"El Deber",             url:"https://eldeber.com.bo",        icon:"📰", cat:"media",          desc:"Noticias fiscales y económicas" },
+  { id:"pagina7",  name:"Página Siete",         url:"https://www.paginasiete.bo",   icon:"📰", cat:"media",          desc:"Noticias fiscales y económicas" },
+  { id:"pwc",      name:"PwC Tax Summaries",    url:"https://taxsummaries.pwc.com/bolivia", icon:"🌐", cat:"intl",   desc:"Résumés fiscaux internationaux" },
+  { id:"ey",       name:"EY Global Tax",        url:"https://www.ey.com/en_gl/tax", icon:"🌐", cat:"intl",           desc:"Alertes fiscales EY" },
+  { id:"kpmg",     name:"KPMG Tax",             url:"https://kpmg.com/xx/en/home/services/tax.html", icon:"🌐", cat:"intl", desc:"Bulletins fiscaux KPMG" },
+];
+
+const KEYWORDS = [
+  "IGF","Impuesto a las Grandes Fortunas","RC-IVA","Ley 1357",
+  "patrimonio","residentes extranjeros","fuente extranjera",
+  "doble imposición","inversiones extranjeras","dividendos",
+  "reforma tributaria","PL N°256-21",
+];
+
+let ALERTS = [
+  { id:1, date:"2025-11-14", source:"asamblea", level:"warning",
+    title:"PL N°256-21 : RC-IVA élargi aux non-domiciliés",
+    summary:"Projet approuvé en commission, en attente de vote plénier. Pourrait imposer les revenus de source étrangère perçus par résidents étrangers.",
+    url:"https://www.asamblea.gob.bo",
+    keywords:["RC-IVA","fuente extranjera","residentes extranjeros","PL N°256-21"] },
+  { id:2, date:"2025-10-03", source:"sin", level:"info",
+    title:"Circular SIN 01/2025 : Résidence fiscale et étrangers",
+    summary:"Le SIN précise les critères de résidence fiscale pour les détenteurs d'une cédula de extranjero. Seuil 183 jours confirmé.",
+    url:"https://www.impuestos.gob.bo",
+    keywords:["residentes extranjeros","RC-IVA"] },
+  { id:3, date:"2025-09-20", source:"eldeber", level:"warning",
+    title:"Gobierno estudia reforma tributaria integral para 2026",
+    summary:"Sources gouvernementales évoquent une refonte fiscale incluant potentiellement l'imposition des revenus de capitaux étrangers.",
+    url:"https://eldeber.com.bo",
+    keywords:["patrimonio","inversiones extranjeras","reforma tributaria"] },
+  { id:4, date:"2025-08-05", source:"asamblea", level:"critical",
+    title:"Proyecto de abrogación del IGF presentado al pleno",
+    summary:"Le gouvernement a soumis un projet de loi pour abroger l'IGF (Ley 1357). Favorable aux résidents étrangers fortunés.",
+    url:"https://www.asamblea.gob.bo",
+    keywords:["IGF","Impuesto a las Grandes Fortunas","Ley 1357"] },
+  { id:5, date:"2025-06-12", source:"pwc", level:"info",
+    title:"PwC Bolivia Tax Summary mis à jour — Q2 2025",
+    summary:"Mise à jour confirmant le régime de source territoriale. PwC note le projet RC-IVA élargi comme risque à surveiller.",
+    url:"https://taxsummaries.pwc.com/bolivia",
+    keywords:["IGF","RC-IVA","fuente extranjera"] },
+];
+
+// ── STATE ───────────────────────────────────────────────────────
+let currentPin    = "";
+let activeFilter  = "all";
+let selectedAlert = null;
+let sessionTimer  = null;
+
+// ── PIN LOGIC ───────────────────────────────────────────────────
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function pinPress(digit) {
+  if (currentPin.length >= 4) return;
+  currentPin += digit;
+  updateDots();
+  if (currentPin.length === 4) setTimeout(checkPin, 120);
+}
+
+function pinDel() {
+  currentPin = currentPin.slice(0,-1);
+  updateDots();
+  document.getElementById("pin-error").textContent = "";
+}
+
+function updateDots() {
+  for (let i=0;i<4;i++) {
+    const d = document.getElementById("d"+i);
+    d.className = "pin-dot" + (i < currentPin.length ? " filled" : "");
+  }
+}
+
+async function checkPin() {
+  const hash = await sha256(currentPin);
+  if (hash === CONFIG.PIN_HASH) {
+    document.getElementById("pin-screen").classList.add("hidden");
+    document.getElementById("app").classList.remove("locked");
+    startSession();
+    renderAll();
+  } else {
+    for (let i=0;i<4;i++) {
+      const d = document.getElementById("d"+i);
+      d.className = "pin-dot error";
+    }
+    document.getElementById("pin-error").textContent = "PIN incorrect";
+    setTimeout(() => {
+      currentPin = "";
+      updateDots();
+      document.getElementById("pin-error").textContent = "";
+    }, 800);
+  }
+}
+
+function lockApp() {
+  currentPin = "";
+  updateDots();
+  document.getElementById("pin-screen").classList.remove("hidden");
+  document.getElementById("app").classList.add("locked");
+  clearTimeout(sessionTimer);
+}
+
+function startSession() {
+  clearTimeout(sessionTimer);
+  if (CONFIG.SESSION_MINUTES > 0) {
+    sessionTimer = setTimeout(lockApp, CONFIG.SESSION_MINUTES * 60 * 1000);
+  }
+}
+
+// Reset session timer on interaction
+document.addEventListener("touchstart", () => { if (!document.getElementById("app").classList.contains("locked")) startSession(); });
+
+// ── NAVIGATION ──────────────────────────────────────────────────
+
+function showPage(name, btn) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
+  document.getElementById("page-"+name).classList.add("active");
+  btn.classList.add("active");
+}
+
+// ── RENDER ──────────────────────────────────────────────────────
+
+function renderAll() {
+  updateLastScan();
+  renderDashboardAlerts();
+  renderAlertsList();
+  renderSources();
+  renderKeywords();
+}
+
+function updateLastScan() {
+  const now = new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  document.getElementById("last-scan-label").textContent = "Màj : " + now;
+}
+
+function alertDotClass(level) {
+  return { critical:"dot-crit", warning:"dot-warn", info:"dot-info", ok:"dot-ok" }[level] || "dot-info";
+}
+function alertItemClass(level) {
+  return { critical:"crit", warning:"warn" }[level] || "";
+}
+function levelLabel(level) {
+  return { critical:"🔴 Critique", warning:"🟡 Attention", info:"🔵 Info", ok:"🟢 Stable" }[level] || level;
+}
+
+function buildAlertHTML(a, compact) {
+  const src = SOURCES.find(s=>s.id===a.source) || {};
+  const expanded = selectedAlert===a.id;
+  return `
+    <div class="alert-item ${alertItemClass(a.level)} ${expanded?"selected":""}" onclick="toggleAlert(${a.id})">
+      <div class="alert-dot ${alertDotClass(a.level)}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-meta">
+          <span>${src.icon||""} ${src.name||a.source}</span>
+          <span>📅 ${a.date}</span>
+          <span>${levelLabel(a.level)}</span>
+        </div>
+        <div class="alert-summary">${a.summary}</div>
+        ${expanded ? `
+          <div class="alert-tags">${a.keywords.map(k=>`<span class="tag">${k}</span>`).join("")}</div>
+          <a class="alert-link" href="${a.url}" target="_blank" rel="noopener noreferrer">🔗 Source officielle →</a>
+        ` : ""}
+      </div>
+    </div>`;
+}
+
+function renderDashboardAlerts() {
+  document.getElementById("dashboard-alerts").innerHTML =
+    ALERTS.slice(0,3).map(a=>buildAlertHTML(a,true)).join("");
+}
+
+function renderAlertsList() {
+  const list = activeFilter==="all" ? ALERTS : ALERTS.filter(a=>a.level===activeFilter);
+  document.getElementById("alerts-list").innerHTML =
+    list.map(a=>buildAlertHTML(a,false)).join("") ||
+    `<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--mono)">Aucune alerte pour ce filtre.</div>`;
+  // Update counters
+  document.getElementById("cnt-crit").textContent = ALERTS.filter(a=>a.level==="critical").length;
+  document.getElementById("cnt-warn").textContent = ALERTS.filter(a=>a.level==="warning").length;
+  // Risk score
+  const score = Math.min(100, ALERTS.filter(a=>a.level==="critical").length*30 + ALERTS.filter(a=>a.level==="warning").length*15 + 10);
+  document.getElementById("risk-value").textContent = score;
+  document.getElementById("risk-fill").style.width = score+"%";
+  document.getElementById("risk-fill").style.background = score>60?"linear-gradient(90deg,#10b981,#ef4444)":score>30?"linear-gradient(90deg,#10b981,#f59e0b)":"linear-gradient(90deg,#10b981,#10b981)";
+  document.getElementById("risk-value").style.color = score>60?"var(--red)":score>30?"var(--gold)":"var(--green)";
+  document.getElementById("risk-label").textContent = score>60?"⚠️ Vigilance requise":score>30?"⚡ Surveillance active — PL N°256-21 en cours":"✅ Situation fiscale stable";
+}
+
+function toggleAlert(id) {
+  selectedAlert = selectedAlert===id ? null : id;
+  renderDashboardAlerts();
+  renderAlertsList();
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+  btn.classList.add("active");
+  renderAlertsList();
+}
+
+function renderSources() {
+  const catLabel = { official:"🏛️ Officielle", media:"📰 Médias", intl:"🌐 Internationale" };
+  const catColor = { official:"rgba(16,185,129,0.15)", media:"rgba(245,158,11,0.15)", intl:"rgba(0,212,255,0.15)" };
+  document.getElementById("sources-list").innerHTML = SOURCES.map(s=>`
+    <div class="source-card" style="border-color:${s.cat==="official"?"rgba(16,185,129,0.2)":s.cat==="intl"?"rgba(0,212,255,0.2)":"rgba(245,158,11,0.2)"}">
+      <div class="source-icon">${s.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="source-name">${s.name}</div>
+        <div class="source-desc">${s.desc}</div>
+        <div class="source-url">${s.url.replace("https://","")}</div>
+        <span class="source-badge" style="background:${catColor[s.cat]};color:${s.cat==="official"?"var(--green)":s.cat==="intl"?"var(--accent)":"var(--gold)"}">
+          ${catLabel[s.cat]} · ● Active
+        </span>
+      </div>
+    </div>`).join("");
+}
+
+function renderKeywords() {
+  const max = Math.max(...KEYWORDS.map(k=>ALERTS.filter(a=>a.keywords.includes(k)).length),1);
+  document.getElementById("kw-list").innerHTML = `
+    <div class="card">
+    ${KEYWORDS.map(k=>{
+      const cnt = ALERTS.filter(a=>a.keywords.includes(k)).length;
+      const pct = (cnt/max)*100;
+      return `<div class="kw-item">
+        <div class="kw-name">${k}</div>
+        <div class="kw-bar-wrap"><div class="kw-bar-fill" style="width:${pct}%"></div></div>
+        <div class="kw-count">${cnt}</div>
+      </div>`;
+    }).join("")}
+    </div>`;
+}
+
+// ── SCAN SIMULATION ─────────────────────────────────────────────
+
+function runScan() {
+  const btn = document.getElementById("scan-btn");
+  const fill = document.getElementById("scan-fill");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner">⟳</span> Scan...`;
+  let p = 0;
+  const iv = setInterval(()=>{
+    p += Math.random()*15;
+    if (p>=100) {
+      p=100; clearInterval(iv);
+      btn.disabled=false;
+      btn.innerHTML=`<span>🔍</span> Scanner`;
+      fill.style.width="0%";
+      // Simulate new alert
+      const newAlert = {
+        id: Date.now(), date: new Date().toISOString().split("T")[0],
+        source:"pagina7", level:"info",
+        title:"Debate parlamentario sobre modernización del sistema tributario",
+        summary:"Nouveaux débats en chambre sur la modernisation fiscale. Pas encore de projet formalisé concernant les revenus étrangers des résidents.",
+        url:"https://www.paginasiete.bo",
+        keywords:["RC-IVA","reforma tributaria"],
+      };
+      ALERTS.unshift(newAlert);
+      updateLastScan();
+      renderAlertsList();
+      renderDashboardAlerts();
+      renderKeywords();
+    }
+    fill.style.width=Math.min(p,100)+"%";
+  },180);
+}
+
+// ── AI ANALYSIS ─────────────────────────────────────────────────
+
+async function runAI() {
+  const btn  = document.getElementById("ai-btn");
+  const box  = document.getElementById("ai-box");
+  const icon = document.getElementById("ai-btn-icon");
+  const text = document.getElementById("ai-btn-text");
+
+  if (!CONFIG.WORKER_URL) {
+    box.innerHTML = `<div class="ai-content">⚠️ Proxy Cloudflare non configuré.\n\nOuvrez config.js et renseignez WORKER_URL avec l'URL de votre Cloudflare Worker.\n\nSuivez le guide dans cloudflare-worker.js pour la mise en place (5 min).</div>`;
+    return;
+  }
+
+  btn.disabled=true;
+  icon.className="spinner"; icon.textContent="⟳";
+  text.textContent="Analyse en cours...";
+  box.innerHTML=`<div class="ai-placeholder"><div class="ai-emoji spinner">⟳</div><div style="font-size:12px;font-family:var(--mono);color:var(--muted)">Interrogation du proxy sécurisé...</div></div>`;
+
+  const context = ALERTS.slice(0,6).map(a=>`[${a.date}] ${a.source.toUpperCase()} — ${a.title}: ${a.summary}`).join("\n");
+  const profile = CONFIG.PROFILE;
+
+  try {
+    // Appel au Worker Cloudflare (proxy — la clé API reste côté serveur)
+    const res = await fetch(CONFIG.WORKER_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        profile,
+        context,
+        alerts_count: ALERTS.length,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Worker erreur ${res.status}`);
+    const data = await res.json();
+    box.innerHTML = `<div class="ai-content">${escapeHtml(data.analysis || "Réponse vide.")}</div>`;
+  } catch(err) {
+    box.innerHTML = `<div class="ai-content">❌ Erreur : ${escapeHtml(err.message)}\n\nVérifiez que votre Cloudflare Worker est déployé et que l'URL dans config.js est correcte.</div>`;
+  } finally {
+    btn.disabled=false;
+    icon.className=""; icon.textContent="▶";
+    text.textContent="Relancer l'analyse";
+  }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── INIT ────────────────────────────────────────────────────────
+// Service Worker
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+</script>
+</body>
+</html>
